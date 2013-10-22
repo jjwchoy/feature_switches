@@ -4,11 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-typedef enum feature_switch_err_t {
-    FEATURE_SWITCH_OK,
-    FEATURE_SWITCH_ERR_UNINITIALISED,
-    FEATURE_SWITCH_ERR_INVALID
-} feature_switch_err_t;
+#include "common.h"
 
 feature_switch_err_t
 feature_switch_initialise(void);
