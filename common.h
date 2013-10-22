@@ -74,7 +74,7 @@ feature_switch_parse_page_meta(
         const void **block_info);
 
 feature_switch_type_t
-feature_switch_block_type(
+feature_switch_block_info(
         void *data,
         uint32_t block_number,
         feature_switch_block_info_t *block_info);
