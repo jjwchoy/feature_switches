@@ -16,7 +16,19 @@ static const char *SWITCHES_FILE = "shmem.test";
 
 static sem_t *SWITCH_MUTEX;
 
-int
+static feature_switch_err_t
+feature_switch_read_nolock(
+        size_t switch_offset,
+        size_t switch_len,
+        void *buf);
+
+static feature_switch_err_t
+feature_switch_set_nolock(
+        size_t switch_offset,
+        size_t switch_len,
+        void *value);
+
+feature_switch_err_t
 feature_switch_initialise(void) {
     int fd = open(SWITCHES_FILE, O_RDWR);
 
@@ -44,20 +56,31 @@ feature_switch_initialise(void) {
     return 0;
 }
 
-int
+feature_switch_err_t
 feature_switch_read(
+        size_t switch_offset,
+        size_t switch_len,
+        void *buf) {
+    feature_switch_err_t rc;
+
+    if (!SWITCHES) {
+        return FEATURE_SWITCH_ERR_UNINITIALISED;
+    }
+
+    sem_wait(SWITCH_MUTEX);
+    rc = feature_switch_read_nolock(switch_offset, switch_len, buf);
+    sem_post(SWITCH_MUTEX);
+    return rc;
+}
+
+feature_switch_err_t
+feature_switch_read_nolock(
         size_t switch_offset,
         size_t switch_len,
         void *buf) {
     uint32_t file_size;
     uint32_t *file_size_p;
 
-    if (!SWITCHES) {
-        return FEATURE_SWITCH_UNINITIALISED;
-    }
-
-    sem_wait(SWITCH_MUTEX);
-
     // First 4 bytes of the SWITCHES file are the total file size
     file_size_p = (uint32_t*)SWITCHES;
     // Read the file size. It is stored in network byte order
@@ -65,29 +88,40 @@ feature_switch_read(
 
     if ((switch_offset + switch_len) > file_size) {
         sem_post(SWITCH_MUTEX);
-        return FEATURE_SWITCH_INVALID;
+        return FEATURE_SWITCH_ERR_INVALID;
     }
 
     memcpy(buf, SWITCHES + switch_offset, switch_len);
-
-    sem_post(SWITCH_MUTEX);
-    return 0;
+    return FEATURE_SWITCH_OK;
 }
 
-int
+feature_switch_err_t
 feature_switch_set(
+        size_t switch_offset,
+        size_t switch_len,
+        void *value) {
+    feature_switch_err_t rc;
+
+    if (!SWITCHES) {
+        return FEATURE_SWITCH_ERR_UNINITIALISED;
+    }
+
+    sem_wait(SWITCH_MUTEX);
+    rc = feature_switch_set_nolock(switch_offset, switch_len, value);
+    sem_post(SWITCH_MUTEX);
+
+    return rc;
+}
+
+
+feature_switch_err_t
+feature_switch_set_nolock(
         size_t switch_offset,
         size_t switch_len,
         void *value) {
     uint32_t file_size;
     uint32_t *file_size_p;
 
-    if (!SWITCHES) {
-        return FEATURE_SWITCH_UNINITIALISED;
-    }
-
-    sem_wait(SWITCH_MUTEX);
-
     // First 4 bytes of the SWITCHES file are the total file size
     file_size_p = (uint32_t*)SWITCHES;
     // Read the file size. It is stored in network byte order
@@ -95,7 +129,7 @@ feature_switch_set(
 
     if ((switch_offset + switch_len) > file_size) {
         sem_post(SWITCH_MUTEX);
-        return FEATURE_SWITCH_INVALID;
+        return FEATURE_SWITCH_ERR_INVALID;
     }
 
     memcpy(SWITCHES + switch_offset, value, switch_len);
@@ -104,14 +138,39 @@ feature_switch_set(
     return 0;
 }
 
-int
+feature_switch_err_t
+feature_switch_set_bit(
+        size_t switch_offset,
+        unsigned char bit_offset,
+        int value) {
+    uint8_t val;
+    feature_switch_err_t rc;
+
+    sem_wait(SWITCH_MUTEX);
+
+    rc = feature_switch_read_nolock(switch_offset, sizeof(uint8_t), &val);
+
+    if (FEATURE_SWITCH_OK == rc) {
+        if (value) {
+            val |= (1 << bit_offset);
+        } else {
+            val &= ~(1 << bit_offset);
+        }
+        rc = feature_switch_set_nolock(switch_offset, sizeof(uint8_t), &val);
+    }
+
+    sem_post(SWITCH_MUTEX);
+    return rc;
+}
+
+feature_switch_err_t
 feature_switch_set_uint8(
         size_t switch_offset,
         uint8_t value) {
     return feature_switch_set(switch_offset, sizeof(uint8_t), &value);
 }
 
-int
+feature_switch_err_t
 feature_switch_set_uint16(
         size_t switch_offset,
         uint16_t value) {
@@ -119,7 +178,7 @@ feature_switch_set_uint16(
     return feature_switch_set(switch_offset, sizeof(uint16_t), &val);
 }
 
-int
+feature_switch_err_t
 feature_switch_set_uint32(
         size_t switch_offset,
         uint32_t value) {
