@@ -37,9 +37,22 @@ enum {
     FEATURE_SWITCH_UINT64_BLOCK_DATA_OFFSET = 2
 };
 
+typedef struct feature_switch_block_t {
+    uint8_t data[FEATURE_SWITCH_BLOCK_SIZE];
+} feature_switch_block_t;
+
+typedef struct feature_switch_page_t {
+    feature_switch_block_t blocks[FEATURE_SWITCH_BLOCKS_PER_PAGE];
+} feature_switch_page_t;
+
+typedef struct feature_switch_pages_t {
+    uint32_t page_count;
+    feature_switch_page_t pages[1];
+} feature_switch_pages_t;
+
 typedef struct feature_switch_block_info_t {
     feature_switch_type_t type;
-    void *data;
+    feature_switch_block_t *data;
 } feature_switch_block_info_t;
 
 uint8_t
@@ -52,8 +65,7 @@ uint32_t
 feature_switch_read_uint32(const void *data);
 
 uint64_t
-feature_switch_read_uint64(const void *data);
-
+feature_switch_read_uint64(const void *data); 
 void
 feature_switch_write_uint8(void *buf, uint8_t val);
 
@@ -68,15 +80,16 @@ feature_switch_write_uint64(void *buf, uint64_t val);
 
 feature_switch_err_t
 feature_switch_parse_page_meta(
-        const void *data,
-        uint32_t *page_number,
-        uint32_t *page_count,
-        const void **block_info);
+        void *data,
+        feature_switch_pages_t *pages_info);
 
-feature_switch_type_t
+feature_switch_err_t
 feature_switch_block_info(
         void *data,
         uint32_t block_number,
         feature_switch_block_info_t *block_info);
+
+feature_switch_err_t
+feature_switch_init_page(void *data);
 
 #endif
